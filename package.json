@@ -1,0 +1,11 @@
+{
+  "name": "expenses-api",
+  "version": "1.0.0",
+  "description": "A simple serverless expenses API for Vercel",
+  "main": "api/expenses.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
