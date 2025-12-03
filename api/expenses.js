@@ -1,48 +1,68 @@
-// In-memory store (resets on every cold start)
+// In-memory expenses array (reset on each deployment)
 let expenses = [];
 
 export default function handler(req, res) {
-  // GET → return all expenses
-  if (req.method === "GET") {
-    return res.status(200).json({
-      success: true,
-      data: expenses
-    });
+  const { method } = req;
+
+  // GET /api/expenses → return all expenses
+  if (method === "GET") {
+    return res.status(200).json({ success: true, expenses });
   }
 
-  // POST → add a new expense
-  if (req.method === "POST") {
-    const { amount, description, category, date } = req.body || {};
+  // POST /api/expenses → add a new expense
+  if (method === "POST") {
+    const { description, amount, category, date } = req.body || {};
 
-    // Validate required fields
-    if (!amount || !description || !category || !date) {
+    if (!description || !amount || !category || !date) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: amount, description, category, date"
+        error: "Missing required fields: description, amount, category, date"
       });
     }
 
-    // Create expense object
-    const newExpense = {
-      id: expenses.length + 1,
-      amount,
-      description,
-      category,
-      date
-    };
-
-    // Add to memory array
+    const newExpense = { description, amount, category, date };
     expenses.push(newExpense);
 
     return res.status(201).json({
       success: true,
-      data: newExpense
+      message: "Expense added",
+      expense: newExpense,
+      expenses
     });
   }
 
-  // Unsupported method
-  return res.status(405).json({
-    success: false,
-    error: `Method ${req.method} not allowed`
-  });
+  // PUT /api/expenses?id=1 → update expense at index
+  if (method === "PUT") {
+    const { id } = req.query;
+    const index = Number(id);
+
+    if (isNaN(index) || index < 0 || index >= expenses.length) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid or missing 'id' for update"
+      });
+    }
+
+    const { description, amount, category, date } = req.body || {};
+
+    if (!description || !amount || !category || !date) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: description, amount, category, date"
+      });
+    }
+
+    expenses[index] = { description, amount, category, date };
+
+    return res.status(200).json({
+      success: true,
+      message: "Expense updated",
+      expense: expenses[index],
+      expenses
+    });
+  }
+
+  // If method is not allowed
+  res.setHeader("Allow", ["GET", "POST", "PUT"]);
+  return res.status(405).json({ error: `Method ${method} not allowed` });
 }
