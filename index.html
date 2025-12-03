@@ -1,125 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Tracker</title>
-    <style>
-        /* Simple CSS for layout */
-        body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
-        h1 { text-align: center; color: #333; }
-        
-        /* Form Styling */
-        form { background: #f4f4f4; padding: 1.5rem; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
-        input, button { padding: 10px; font-size: 1rem; border: 1px solid #ddd; border-radius: 4px; }
-        button { background-color: #0070f3; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background-color: #005bb5; }
-
-        /* List Styling */
-        #expenseList { list-style: none; padding: 0; margin-top: 2rem; }
-        .expense-item { background: white; border-bottom: 1px solid #eee; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .expense-info { display: flex; flex-direction: column; }
-        .expense-amount { font-weight: bold; color: #e00; font-size: 1.2rem; }
-        .meta { font-size: 0.85rem; color: #666; margin-top: 4px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expenses</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .expense {
+      background: #fafafa;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+    .expense button {
+      padding: 5px 10px;
+      margin-top: 5px;
+      width: auto;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .expense button:hover {
+      background: #0b7dda;
+    }
+  </style>
 </head>
 <body>
-
-    <h1>My Expenses</h1>
+  <div class="container">
+    <h2>Expenses Manager</h2>
 
     <form id="expenseForm">
-        <input type="text" id="description" placeholder="Description (e.g. Lunch)" required>
-        <input type="number" id="amount" placeholder="Amount (e.g. 15.50)" step="0.01" inputmode="decimal" required>
+      <input type="hidden" id="editingId" />
 
-        
-        <input type="text" id="category" placeholder="Category (e.g. Food)" required>
-        <input type="date" id="date" required>
-        
-        <button type="submit">Add Expense</button>
+      <input type="text" id="description" placeholder="Description" required />
+      <input type="number" id="amount" placeholder="Amount" step="0.01" inputmode="decimal" required />
+      <input type="text" id="category" placeholder="Category" required />
+      <input type="date" id="date" required />
+
+      <button type="submit">Save Expense</button>
     </form>
 
-    <ul id="expenseList">
-        <p style="text-align:center; color:#888;">Loading expenses...</p>
-    </ul>
+    <h3>Expenses</h3>
+    <div id="expensesList"></div>
+  </div>
 
-    <script>
-        const API_URL = '/api/expenses';
-        const list = document.getElementById('expenseList');
-        const form = document.getElementById('expenseForm');
+  <script>
+    const API_URL = "/api/expenses";
 
-        // Set default date to today
-        document.getElementById('date').valueAsDate = new Date();
+    async function loadExpenses() {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      displayExpenses(data.expenses);
+    }
 
-        // 1. Function to fetch and display expenses
-        async function fetchExpenses() {
-            try {
-                const response = await fetch(API_URL);
-                const result = await response.json();
-                
-                // Clear the list
-                list.innerHTML = '';
+    function displayExpenses(expenses) {
+      const list = document.getElementById("expensesList");
+      list.innerHTML = "";
 
-                if (result.data.length === 0) {
-                    list.innerHTML = '<p style="text-align:center; color:#888;">No expenses found yet.</p>';
-                    return;
-                }
+      expenses.forEach((exp, index) => {
+        const div = document.createElement("div");
+        div.className = "expense";
+        div.innerHTML = `
+          <strong>${exp.description}</strong><br>
+          Amount: €${exp.amount.toFixed(2)}<br>
+          Category: ${exp.category}<br>
+          Date: ${exp.date}<br>
+          <button onclick="modifyExpense(${index})">Modify</button>
+        `;
+        list.appendChild(div);
+      });
+    }
 
-                // Loop through expenses and create HTML elements
-                result.data.forEach(expense => {
-                    const li = document.createElement('li');
-                    li.className = 'expense-item';
-                    li.innerHTML = `
-                        <div class="expense-info">
-                            <strong>${expense.description}</strong>
-                            <span class="meta">${expense.category} • ${expense.date}</span>
-                        </div>
-                        <div class="expense-amount">-$${expense.amount}</div>
-                    `;
-                    list.appendChild(li);
-                });
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                list.innerHTML = '<p style="color:red; text-align:center;">Error loading data.</p>';
-            }
-        }
+    function modifyExpense(index) {
+      fetch(API_URL)
+        .then(res => res.json())
+        .then(data => {
+          const exp = data.expenses[index];
 
-        // 2. Event Listener for Form Submit (POST)
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Stop page from reloading
-
-            // Gather data from inputs
-            const expenseData = {
-                description: document.getElementById('description').value,
-                amount: Number(document.getElementById('amount').value),
-                category: document.getElementById('category').value,
-                date: document.getElementById('date').value
-            };
-
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(expenseData)
-                });
-
-                if (response.ok) {
-                    // Clear form inputs
-                    document.getElementById('description').value = '';
-                    document.getElementById('amount').value = '';
-                    document.getElementById('category').value = '';
-                    
-                    // Reload the list to show the new item
-                    fetchExpenses();
-                } else {
-                    alert('Failed to add expense');
-                }
-            } catch (error) {
-                console.error('Error adding expense:', error);
-            }
+          // Fill the form
+          document.getElementById("editingId").value = index;
+          document.getElementById("description").value = exp.description;
+          document.getElementById("amount").value = exp.amount;
+          document.getElementById("category").value = exp.category;
+          document.getElementById("date").value = exp.date;
         });
+    }
 
-        // Load data when page opens
-        fetchExpenses();
-    </script>
+    document.getElementById("expenseForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const id = document.getElementById("editingId").value;
+      const expense = {
+        description: document.getElementById("description").value,
+        amount: parseFloat(document.getElementById("amount").value),
+        category: document.getElementById("category").value,
+        date: document.getElementById("date").value
+      };
+
+      if (id) {
+        // PUT = modify existing expense
+        await fetch(`${API_URL}?id=${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(expense)
+        });
+      } else {
+        // POST = add new expense
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(expense)
+        });
+      }
+
+      // Reset form
+      document.getElementById("expenseForm").reset();
+      document.getElementById("editingId").value = "";
+
+      loadExpenses();
+    });
+
+    loadExpenses();
+  </script>
+
 </body>
 </html>
