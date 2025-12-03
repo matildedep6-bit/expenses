@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expenses Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #0059c1;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      background: white;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .amount {
+      font-weight: bold;
+      color: #0070f3;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Expenses Tracker</h1>
+
+  <form id="expenseForm">
+    <label>Description:</label>
+    <input type="text" id="description" required>
+
+    <label>Amount (€):</label>
+    <input type="number" id="amount" step="0.01" required>
+
+    <button type="submit">Add Expense</button>
+  </form>
+
+  <h2>Expenses</h2>
+  <ul id="expensesList"></ul>
+
+  <script>
+    const API_URL = "/api/expenses"; // Works on Vercel
+
+    const form = document.getElementById("expenseForm");
+    const list = document.getElementById("expensesList");
+
+    // ---- LOAD EXPENSES ON PAGE LOAD ----
+    async function loadExpenses() {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+
+      list.innerHTML = "";
+
+      data.data.forEach(exp => {
+        addExpenseToDOM(exp);
+      });
+    }
+
+    // ---- ADD EXPENSE TO DOM ----
+    function addExpenseToDOM(expense) {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span>${expense.description}</span>
+        <span class="amount">€${expense.amount}</span>
+      `;
+      list.appendChild(li);
+    }
+
+    // ---- HANDLE FORM SUBMIT (POST) ----
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const description = document.getElementById("description").value.trim();
+      const amount = parseFloat(document.getElementById("amount").value);
+
+      if (!description || !amount) return alert("Please fill in all fields.");
+
+      const expense = {
+        description,
+        amount,
+        category: "general",
+        date: new Date().toISOString().split("T")[0]
+      };
+
+      // POST the expense to API
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(expense)
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        return alert("Error: " + result.error);
+      }
+
+      // Add to UI immediately
+      addExpenseToDOM(result.data);
+
+      // Reset form
+      form.reset();
+    });
+
+    // Initial load
+    loadExpenses();
+  </script>
+
+</body>
+</html>
