@@ -1,6 +1,9 @@
 {
-  "version": 3,
+  "version": 2,
   "routes": [
-    { "src": "/api/expenses", "dest": "/api/expenses.js" }
+    {
+      "src": "/api/expenses",
+      "dest": "/api/expenses.js"
+    }
   ]
 }
