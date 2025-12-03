@@ -1,72 +1,13 @@
-// In-memory store (reset on cold starts)
-let expenses = [];
-
-export default async function handler(req, res) {
-  // Ensure JSON body parsing
-  async function getBody() {
-    if (req.body) return req.body;
-    return new Promise((resolve, reject) => {
-      let data = "";
-      req.on("data", chunk => data += chunk);
-      req.on("end", () => {
-        try {
-          resolve(JSON.parse(data || "{}"));
-        } catch (err) {
-          reject(err);
-        }
-      });
-      req.on("error", reject);
-    });
-  }
-
-  // ---- GET: return all expenses ----
-  if (req.method === "GET") {
-    return res.status(200).json({
-      success: true,
-      data: expenses
-    });
-  }
-
-  // ---- POST: add new expense ----
-  if (req.method === "POST") {
-    let body;
-    try {
-      body = await getBody();
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid JSON body"
-      });
+{
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
+      ]
     }
-
-    const { amount, description, category, date } = body;
-
-    if (!amount || !description || !category || !date) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required fields: amount, description, category, date"
-      });
-    }
-
-    const newExpense = {
-      id: expenses.length + 1,
-      amount,
-      description,
-      category,
-      date
-    };
-
-    expenses.push(newExpense);
-
-    return res.status(201).json({
-      success: true,
-      data: newExpense
-    });
-  }
-
-  // ---- Unsupported method ----
-  return res.status(405).json({
-    success: false,
-    error: `Method ${req.method} not allowed`
-  });
+  ]
 }
