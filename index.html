@@ -1,107 +1,289 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Expenses</title>
-  <style>
-    body { font-family: Arial; max-width: 600px; margin: auto; padding: 20px; }
-    form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
-    input, button { padding: 10px; font-size: 16px; }
-    button { background: #0070f3; color: white; border: none; cursor: pointer; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 10px; display: flex; justify-content: space-between; }
-    .edit-btn { background: orange; margin-left: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-  <h1>My Expenses</h1>
+    <div class="max-w-xl mx-auto py-10 px-4">
+        
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">💸 Expense Tracker</h1>
+            <p class="text-slate-500 text-sm">Running on Vercel Serverless (In-Memory)</p>
+            <p id="mode-badge" class="hidden text-xs font-semibold bg-orange-100 text-orange-700 px-2 py-1 rounded-full inline-block mt-2">
+                ⚠️ Preview Mode (Local Data)
+            </p>
+        </header>
 
-  <form id="expenseForm">
-    <input id="description" placeholder="Description" required />
-    <input id="amount" type="number" step="0.01" placeholder="Amount" required />
-    <input id="category" placeholder="Category" required />
-    <input id="date" type="date" required />
-    <button>Add Expense</button>
-  </form>
+        <!-- Input Form -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6 border border-slate-200">
+            <h2 class="text-lg font-semibold mb-4 text-slate-700">Add New Expense</h2>
+            <form id="expenseForm" class="space-y-4">
+                
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Description</label>
+                    <input type="text" id="descInput" placeholder="e.g. Lunch, Uber, Groceries" required
+                        class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                </div>
+                
+                <!-- Amount -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Amount (€)</label>
+                    <input type="number" id="amountInput" placeholder="0.00" step="0.01" required
+                        class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                </div>
 
-  <ul id="list"></ul>
+                <!-- Category & Date Row -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">Category</label>
+                        <select id="categoryInput" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Health">Health</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">Date</label>
+                        <input type="date" id="dateInput" required
+                            class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-slate-600">
+                    </div>
+                </div>
 
-  <script>
-    const API = "/api/expenses";
-    const list = document.getElementById("list");
+                <button type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2">
+                    <span id="btnText">Add Expense</span>
+                </button>
+            </form>
+            <div id="msgBox" class="mt-3 text-center text-sm hidden"></div>
+        </div>
 
-    async function loadExpenses() {
-      const res = await fetch(API);
-      const { expenses } = await res.json();
-      render(expenses);
-    }
+        <!-- Expense List -->
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-slate-700">History</h2>
+                <button onclick="fetchExpenses()" class="text-sm text-blue-600 hover:underline">Refresh List</button>
+            </div>
+            
+            <div id="loading" class="p-8 text-center text-slate-400">
+                Loading expenses...
+            </div>
 
-    function render(expenses) {
-      list.innerHTML = "";
-      expenses.forEach(exp => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <div>
-            <strong>${exp.description}</strong><br>
-            ${exp.category} • ${exp.date}<br>
-            <strong>$${exp.amount.toFixed(2)}</strong>
-          </div>
+            <ul id="expenseList" class="divide-y divide-slate-100 max-h-96 overflow-y-auto hidden">
+                <!-- Expenses will be injected here -->
+            </ul>
+            
+            <div id="emptyState" class="p-8 text-center text-slate-400 hidden">
+                No expenses recorded yet.
+            </div>
+        </div>
 
-          <div>
-            <button class="edit-btn" onclick="editExpense('${exp.id}')">Modify</button>
-          </div>
-        `;
-        list.appendChild(li);
-      });
-    }
+    </div>
 
-    document.getElementById("expenseForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
+    <script>
+        const API_URL = '/api/expenses';
 
-      const expense = {
-        description: description.value,
-        amount: amount.value,
-        category: category.value,
-        date: date.value
-      };
+        // DOM Elements
+        const form = document.getElementById('expenseForm');
+        const descInput = document.getElementById('descInput');
+        const amountInput = document.getElementById('amountInput');
+        const categoryInput = document.getElementById('categoryInput');
+        const dateInput = document.getElementById('dateInput');
+        const expenseList = document.getElementById('expenseList');
+        const loading = document.getElementById('loading');
+        const emptyState = document.getElementById('emptyState');
+        const msgBox = document.getElementById('msgBox');
+        const modeBadge = document.getElementById('mode-badge');
 
-      await fetch(API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(expense)
-      });
+        // Set default date to today
+        dateInput.valueAsDate = new Date();
 
-      description.value = "";
-      amount.value = "";
-      category.value = "";
-      date.value = "";
+        // --- LOCAL FALLBACK DATA (For Preview/Demo) ---
+        // This array simulates the backend DB when the API is unreachable
+        let localExpenses = [
+            { 
+                id: 1, 
+                description: "Preview Mode Item", 
+                amount: 0, 
+                category: "Other", 
+                date: new Date().toISOString().split('T')[0] 
+            }
+        ];
 
-      loadExpenses();
-    });
+        // Helper to format currency
+        const formatMoney = (amount) => {
+            // Using 'en-IE' (Ireland) creates English format with Euro symbol (e.g., €10.00)
+            return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(amount);
+        };
 
-    async function editExpense(id) {
-      const newDescription = prompt("New description:");
-      const newAmount = prompt("New amount:");
-      const newCategory = prompt("New category:");
-      const newDate = prompt("New date (YYYY-MM-DD):");
+        // Helper to map category to color (Tailwind classes)
+        const getCategoryColor = (cat) => {
+            const map = {
+                'Food': 'bg-orange-100 text-orange-700',
+                'Transport': 'bg-blue-100 text-blue-700',
+                'Entertainment': 'bg-purple-100 text-purple-700',
+                'Utilities': 'bg-yellow-100 text-yellow-700',
+                'Health': 'bg-red-100 text-red-700',
+                'Other': 'bg-slate-100 text-slate-700'
+            };
+            return map[cat] || map['Other'];
+        };
 
-      await fetch(API + "?id=" + id, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: newDescription,
-          amount: newAmount,
-          category: newCategory,
-          date: newDate
-        })
-      });
+        // Fetch Expenses from API (with Fallback)
+        async function fetchExpenses() {
+            loading.classList.remove('hidden');
+            expenseList.classList.add('hidden');
+            emptyState.classList.add('hidden');
 
-      loadExpenses();
-    }
+            try {
+                // Try to fetch from real API
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error('API Error');
+                const data = await res.json();
+                
+                // Hide badge if connected
+                modeBadge.classList.add('hidden');
+                renderList(data);
+            } catch (err) {
+                console.warn("API unreachable (expected in preview). Using local data.", err);
+                
+                // FALLBACK: Use local array
+                modeBadge.classList.remove('hidden');
+                renderList(localExpenses);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
 
-    loadExpenses();
-  </script>
+        // Render the list
+        function renderList(expenses) {
+            expenseList.innerHTML = '';
 
+            if (!expenses || expenses.length === 0) {
+                emptyState.classList.remove('hidden');
+                expenseList.classList.add('hidden');
+                return;
+            }
+
+            // Sort by newest first
+            [...expenses].reverse().forEach(expense => {
+                const li = document.createElement('li');
+                li.className = "p-4 flex justify-between items-center hover:bg-slate-50 transition";
+                
+                const dateObj = new Date(expense.date);
+                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const catColor = getCategoryColor(expense.category);
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-slate-100 text-slate-500">
+                            <span class="text-xs font-bold uppercase">${dateObj.getDate()}</span>
+                            <span class="text-[10px] uppercase">${dateObj.toLocaleDateString('en-US', { month: 'short' })}</span>
+                        </div>
+                        <div>
+                            <p class="font-medium text-slate-800">${expense.description}</p>
+                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${catColor}">
+                                ${expense.category || 'Other'}
+                            </span>
+                        </div>
+                    </div>
+                    <span class="font-bold text-lg ${expense.amount < 0 ? 'text-red-500' : 'text-slate-700'}">
+                        ${formatMoney(expense.amount)}
+                    </span>
+                `;
+                expenseList.appendChild(li);
+            });
+
+            expenseList.classList.remove('hidden');
+        }
+
+        // Handle Form Submit (with Fallback)
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const description = descInput.value;
+            const amount = amountInput.value;
+            const category = categoryInput.value;
+            const date = dateInput.value;
+
+            const btn = form.querySelector('button');
+
+            // Disable button
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+            document.getElementById('btnText').textContent = "Saving...";
+
+            try {
+                // Try sending to real API
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description, amount, category, date })
+                });
+
+                if (res.ok) {
+                    descInput.value = '';
+                    amountInput.value = '';
+                    dateInput.valueAsDate = new Date();
+                    showMsg("Expense added successfully!", "text-green-600");
+                    fetchExpenses();
+                } else {
+                    throw new Error("API Error");
+                }
+            } catch (err) {
+                console.warn("API unreachable. Saving to local mock data.", err);
+                
+                // FALLBACK: Save to local array
+                const newLocalExpense = {
+                    id: Date.now(),
+                    description,
+                    amount: parseFloat(amount),
+                    category,
+                    date
+                };
+                localExpenses.push(newLocalExpense);
+                
+                descInput.value = '';
+                amountInput.value = '';
+                dateInput.valueAsDate = new Date();
+                
+                showMsg("Saved locally (Preview Mode)", "text-orange-600");
+                renderList(localExpenses);
+                modeBadge.classList.remove('hidden');
+
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                document.getElementById('btnText').textContent = "Add Expense";
+            }
+        });
+
+        function showMsg(text, colorClass) {
+            msgBox.textContent = text;
+            msgBox.className = `mt-3 text-center text-sm ${colorClass}`;
+            msgBox.classList.remove('hidden');
+            setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initial Load
+        fetchExpenses();
+    </script>
 </body>
 </html>
