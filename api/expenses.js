@@ -1,85 +1,49 @@
-// Persistent expenses storage via Vercel KV
-const KV_URL = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+// This variable lives in the server's memory.
+// WARNING: In Vercel/Serverless, this data will be wiped when the function
+// "cold starts" or after a period of inactivity.
+let memoryExpenses = [
+    { 
+        id: 1, 
+        description: "Initial Demo Expense", 
+        amount: 0, 
+        category: "Other", 
+        date: new Date().toISOString().split('T')[0] 
+    }
+];
 
-async function kvGet(key) {
-  const res = await fetch(`${KV_URL}/get/${key}`, {
-    headers: { Authorization: `Bearer ${KV_TOKEN}` }
-  });
-  return res.json();
-}
-
-async function kvSet(key, value) {
-  await fetch(`${KV_URL}/set/${key}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${KV_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ value })
-  });
-}
-
-export default async function handler(req, res) {
-  const method = req.method;
-
-  // always load stored expenses
-  let store = await kvGet("expenses");
-  let expenses = store?.result ? JSON.parse(store.result) : [];
-
-  if (method === "GET") {
-    return res.status(200).json({ success: true, expenses });
-  }
-
-  if (method === "POST") {
-    const { description, amount, category, date } = req.body || {};
-
-    if (!description || !amount || !category || !date) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing fields"
-      });
+export default function handler(req, res) {
+    // 1. Handle GET requests (Retrieve all expenses)
+    if (req.method === 'GET') {
+        return res.status(200).json(memoryExpenses);
     }
 
-    const newExpense = {
-      id: Date.now().toString(),
-      description,
-      amount: parseFloat(amount),
-      category,
-      date
-    };
+    // 2. Handle POST requests (Add a new expense)
+    if (req.method === 'POST') {
+        try {
+            const { description, amount, category, date } = req.body;
 
-    expenses.push(newExpense);
+            // Basic validation
+            if (!description || amount === undefined || !category || !date) {
+                return res.status(400).json({ error: 'All fields are required' });
+            }
 
-    await kvSet("expenses", JSON.stringify(expenses));
+            const newExpense = {
+                id: Date.now(), // Simple ID generation
+                description,
+                amount: parseFloat(amount),
+                category,
+                date: date // User provided date (YYYY-MM-DD)
+            };
 
-    return res
-      .status(201)
-      .json({ success: true, expense: newExpense, expenses });
-  }
+            // Push to our in-memory array
+            memoryExpenses.push(newExpense);
 
-  if (method === "PUT") {
-    const { id } = req.query;
-    const { description, amount, category, date } = req.body || {};
+            return res.status(201).json(newExpense);
+        } catch (error) {
+            return res.status(500).json({ error: 'Failed to process data' });
+        }
+    }
 
-    const index = expenses.findIndex((e) => e.id === id);
-    if (index === -1)
-      return res
-        .status(404)
-        .json({ success: false, error: "Expense not found" });
-
-    expenses[index] = {
-      ...expenses[index],
-      description,
-      amount: parseFloat(amount),
-      category,
-      date
-    };
-
-    await kvSet("expenses", JSON.stringify(expenses));
-
-    return res.status(200).json({ success: true, expenses });
-  }
-
-  return res.status(405).json({ success: false, error: "Method not allowed" });
+    // 3. Handle unsupported methods
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
