@@ -1,15 +1,13 @@
 {
-  "name": "vercel-expenses-api",
+  "name": "vercel-serverless-expense-tracker",
   "version": "1.0.0",
-  "description": "Serverless API for tracking expenses",
-  "type": "module",
+  "description": "Simple in-memory expense tracker for Vercel",
   "main": "api/expenses.js",
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel"
+    "start": "node api/expenses.js"
   },
+  "dependencies": {},
   "engines": {
     "node": "24.x"
-  },
-  "dependencies": {}
+  }
 }
