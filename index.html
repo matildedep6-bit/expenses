@@ -65,10 +65,16 @@
                     </div>
                 </div>
 
-                <button type="submit" 
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2">
-                    <span id="btnText">Add Expense</span>
-                </button>
+                <div class="flex gap-2">
+                    <button type="submit" 
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2">
+                        <span id="btnText">Add Expense</span>
+                    </button>
+                    <button type="button" id="cancelBtn" onclick="cancelEdit()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hidden">
+                        Cancel
+                    </button>
+                </div>
             </form>
             <div id="msgBox" class="mt-3 text-center text-sm hidden"></div>
         </div>
@@ -110,6 +116,10 @@
         const msgBox = document.getElementById('msgBox');
         const modeBadge = document.getElementById('mode-badge');
 
+        // Edit mode variables
+        let editingExpenseId = null;
+        let currentExpenses = [];
+
         // Set default date to today
         dateInput.valueAsDate = new Date();
 
@@ -144,6 +154,30 @@
             return map[cat] || map['Other'];
         };
 
+        // Edit expense function
+        function editExpense(expense) {
+            populateForm(expense);
+        }
+
+        function populateForm(expense) {
+            descInput.value = expense.description;
+            amountInput.value = expense.amount;
+            categoryInput.value = expense.category;
+            dateInput.value = expense.date;
+            editingExpenseId = expense.id;
+            document.getElementById('btnText').textContent = "Update Expense";
+            document.getElementById('cancelBtn').classList.remove('hidden');
+        }
+
+        function cancelEdit() {
+            descInput.value = '';
+            amountInput.value = '';
+            dateInput.valueAsDate = new Date();
+            editingExpenseId = null;
+            document.getElementById('btnText').textContent = "Add Expense";
+            document.getElementById('cancelBtn').classList.add('hidden');
+        }
+
         // Fetch Expenses from API (with Fallback)
         async function fetchExpenses() {
             loading.classList.remove('hidden');
@@ -158,12 +192,14 @@
                 
                 // Hide badge if connected
                 modeBadge.classList.add('hidden');
+                currentExpenses = data;
                 renderList(data);
             } catch (err) {
                 console.warn("API unreachable (expected in preview). Using local data.", err);
                 
                 // FALLBACK: Use local array
                 modeBadge.classList.remove('hidden');
+                currentExpenses = localExpenses;
                 renderList(localExpenses);
             } finally {
                 loading.classList.add('hidden');
@@ -202,9 +238,14 @@
                             </span>
                         </div>
                     </div>
-                    <span class="font-bold text-lg ${expense.amount < 0 ? 'text-red-500' : 'text-slate-700'}">
-                        ${formatMoney(expense.amount)}
-                    </span>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg ${expense.amount < 0 ? 'text-red-500' : 'text-slate-700'}">
+                            ${formatMoney(expense.amount)}
+                        </span>
+                        <button onclick='editExpense(${JSON.stringify(expense).replace(/'/g, "\\'")})' class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Edit
+                        </button>
+                    </div>
                 `;
                 expenseList.appendChild(li);
             });
@@ -226,21 +267,30 @@
             // Disable button
             btn.disabled = true;
             btn.classList.add('opacity-75');
-            document.getElementById('btnText').textContent = "Saving...";
+            document.getElementById('btnText').textContent = editingExpenseId ? "Updating..." : "Saving...";
 
             try {
+                const method = editingExpenseId ? 'PUT' : 'POST';
+                const body = editingExpenseId 
+                    ? JSON.stringify({ id: editingExpenseId, description, amount, category, date })
+                    : JSON.stringify({ description, amount, category, date });
+
                 // Try sending to real API
                 const res = await fetch(API_URL, {
-                    method: 'POST',
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ description, amount, category, date })
+                    body: body
                 });
 
                 if (res.ok) {
+                    const wasEditing = !!editingExpenseId;
                     descInput.value = '';
                     amountInput.value = '';
                     dateInput.valueAsDate = new Date();
-                    showMsg("Expense added successfully!", "text-green-600");
+                    editingExpenseId = null;
+                    document.getElementById('btnText').textContent = "Add Expense";
+                    document.getElementById('cancelBtn').classList.add('hidden');
+                    showMsg(wasEditing ? "Expense updated successfully!" : "Expense added successfully!", "text-green-600");
                     fetchExpenses();
                 } else {
                     throw new Error("API Error");
@@ -248,28 +298,48 @@
             } catch (err) {
                 console.warn("API unreachable. Saving to local mock data.", err);
                 
-                // FALLBACK: Save to local array
-                const newLocalExpense = {
-                    id: Date.now(),
-                    description,
-                    amount: parseFloat(amount),
-                    category,
-                    date
-                };
-                localExpenses.push(newLocalExpense);
+                const wasEditing = !!editingExpenseId;
+                if (editingExpenseId) {
+                    // Update local expense
+                    const index = localExpenses.findIndex(exp => exp.id == editingExpenseId);
+                    if (index !== -1) {
+                        localExpenses[index] = {
+                            id: editingExpenseId,
+                            description,
+                            amount: parseFloat(amount),
+                            category,
+                            date
+                        };
+                        showMsg("Updated locally (Preview Mode)", "text-orange-600");
+                        renderList(localExpenses);
+                    }
+                } else {
+                    // Add new local expense
+                    const newLocalExpense = {
+                        id: Date.now(),
+                        description,
+                        amount: parseFloat(amount),
+                        category,
+                        date
+                    };
+                    localExpenses.push(newLocalExpense);
+                    showMsg("Saved locally (Preview Mode)", "text-orange-600");
+                    renderList(localExpenses);
+                }
                 
                 descInput.value = '';
                 amountInput.value = '';
                 dateInput.valueAsDate = new Date();
-                
-                showMsg("Saved locally (Preview Mode)", "text-orange-600");
-                renderList(localExpenses);
+                editingExpenseId = null;
+                document.getElementById('btnText').textContent = "Add Expense";
+                document.getElementById('cancelBtn').classList.add('hidden');
                 modeBadge.classList.remove('hidden');
 
             } finally {
                 btn.disabled = false;
                 btn.classList.remove('opacity-75');
-                document.getElementById('btnText').textContent = "Add Expense";
+                document.getElementById('btnText').textContent = editingExpenseId ? "Update Expense" : "Add Expense";
+                document.getElementById('cancelBtn').classList.toggle('hidden', !editingExpenseId);
             }
         });
 

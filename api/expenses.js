@@ -44,6 +44,36 @@ export default function handler(req, res) {
         }
     }
 
-    // 3. Handle unsupported methods
+    // 3. Handle PUT requests (Update an existing expense)
+    if (req.method === 'PUT') {
+        try {
+            const { id, description, amount, category, date } = req.body;
+
+            // Basic validation
+            if (!id || !description || amount === undefined || !category || !date) {
+                return res.status(400).json({ error: 'All fields are required' });
+            }
+
+            const expenseIndex = memoryExpenses.findIndex(exp => exp.id == id);
+            if (expenseIndex === -1) {
+                return res.status(404).json({ error: 'Expense not found' });
+            }
+
+            // Update the expense
+            memoryExpenses[expenseIndex] = {
+                id: parseInt(id),
+                description,
+                amount: parseFloat(amount),
+                category,
+                date
+            };
+
+            return res.status(200).json(memoryExpenses[expenseIndex]);
+        } catch (error) {
+            return res.status(500).json({ error: 'Failed to update data' });
+        }
+    }
+
+    // 4. Handle unsupported methods
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
