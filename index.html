@@ -154,9 +154,36 @@
             return map[cat] || map['Other'];
         };
 
-        // Edit expense function
-        function editExpense(expense) {
-            populateForm(expense);
+        // Delete expense function
+        async function deleteExpense(id) {
+            if (!confirm('Are you sure you want to delete this expense?')) return;
+
+            try {
+                // Try to delete from real API
+                const res = await fetch(API_URL, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+
+                if (res.ok) {
+                    showMsg("Expense deleted successfully!", "text-green-600");
+                    fetchExpenses();
+                } else {
+                    throw new Error("API Error");
+                }
+            } catch (err) {
+                console.warn("API unreachable. Deleting from local mock data.", err);
+                
+                // FALLBACK: Delete from local array
+                const index = localExpenses.findIndex(exp => exp.id == id);
+                if (index !== -1) {
+                    localExpenses.splice(index, 1);
+                    showMsg("Deleted locally (Preview Mode)", "text-orange-600");
+                    renderList(localExpenses);
+                }
+                modeBadge.classList.remove('hidden');
+            }
         }
 
         function populateForm(expense) {
@@ -244,6 +271,9 @@
                         </span>
                         <button onclick='editExpense(${JSON.stringify(expense).replace(/'/g, "\\'")})' class="text-blue-600 hover:text-blue-800 text-sm font-medium">
                             Edit
+                        </button>
+                        <button onclick='deleteExpense(${expense.id})' class="text-red-600 hover:text-red-800 text-sm font-medium">
+                            Delete
                         </button>
                     </div>
                 `;

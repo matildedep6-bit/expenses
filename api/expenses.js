@@ -74,6 +74,30 @@ export default function handler(req, res) {
         }
     }
 
-    // 4. Handle unsupported methods
+    // 4. Handle DELETE requests (Delete an existing expense)
+    if (req.method === 'DELETE') {
+        try {
+            const { id } = req.body;
+
+            // Basic validation
+            if (!id) {
+                return res.status(400).json({ error: 'ID is required' });
+            }
+
+            const expenseIndex = memoryExpenses.findIndex(exp => exp.id == id);
+            if (expenseIndex === -1) {
+                return res.status(404).json({ error: 'Expense not found' });
+            }
+
+            // Remove the expense
+            memoryExpenses.splice(expenseIndex, 1);
+
+            return res.status(200).json({ message: 'Expense deleted successfully' });
+        } catch (error) {
+            return res.status(500).json({ error: 'Failed to delete data' });
+        }
+    }
+
+    // 5. Handle unsupported methods
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
